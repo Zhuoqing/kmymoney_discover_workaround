@@ -374,6 +374,61 @@ public:
   QFile  m_fpTrace;
 };
 
+#include <QProcess>
+#include <ktemporaryfile.h>
+bool OfxPythonHttpsRequest(const QString& method, const KUrl &url, const QByteArray &postData, const QMap<QString, QString>& metaData, const QString& dst)
+{
+  QDir homeDir(QDir::home());
+  if (!homeDir.exists("ofx_pythondownload.py")) {
+    return false;
+  }
+  KTemporaryFile tmpPost;
+  if (!tmpPost.open()) {
+    qWarning("Unable to open tempfile '%s' for post.", qPrintable(tmpPost.fileName()));
+    return false;
+  }
+  tmpPost.write(postData);
+  tmpPost.close();
+  qDebug("tempfile '%s' for post data", qPrintable(tmpPost.fileName()));
+  
+  KTemporaryFile tmpMeta;
+  if (!tmpMeta.open()) {
+    qWarning("Unable to open tempfile '%s' for metaData.", qPrintable(tmpMeta.fileName()));
+    return false;
+  }
+
+  QMap<QString, QString>::const_iterator it = metaData.begin();
+  while (it != metaData.end())
+  {
+    QByteArray dataKey = it.key().toUtf8();
+    tmpMeta.write(dataKey, strlen(dataKey));
+    tmpMeta.write("\n", 1);
+    QByteArray dataValue = it.value().toUtf8();
+    tmpMeta.write(dataValue, strlen(dataValue));
+    tmpMeta.write("\n", 1);
+    ++it;
+  }  
+  tmpMeta.close();
+  qDebug("tempfile '%s' for metaData", qPrintable(tmpMeta.fileName()));
+  
+  QString pythonScript = QString("%1/ofx_pythondownload.py").arg(QDir::homePath());
+
+  QProcess pyDownload;
+  pyDownload.start("python", QStringList() << pythonScript << method << url.url() << tmpMeta.fileName() << tmpPost.fileName() << dst);
+  if (!pyDownload.waitForStarted())
+    return false;
+
+  if (!pyDownload.waitForFinished(-1))
+    return false;
+
+  int exitCode = pyDownload.exitCode();
+  qDebug("pyDownload exit with '%d'", exitCode);
+  if (exitCode != 0)
+    return false;
+  
+  return true;
+}
+
 OfxHttpsRequest::OfxHttpsRequest(const QString& type, const KUrl &url, const QByteArray &postData, const QMap<QString, QString>& metaData, const KUrl& dst, bool showProgressInfo) :
     d(new Private),
     m_dst(dst),
@@ -381,6 +436,9 @@ OfxHttpsRequest::OfxHttpsRequest(const QString& type, const KUrl &url, const QBy
 {
   Q_UNUSED(type);
   Q_UNUSED(metaData);
+
+  if (OfxPythonHttpsRequest(type, url, postData, metaData, dst.path()))
+    return;
 
   m_eventLoop = new QEventLoop(qApp->activeWindow());
 
@@ -395,8 +453,10 @@ OfxHttpsRequest::OfxHttpsRequest(const QString& type, const KUrl &url, const QBy
     jobFlags = KIO::HideProgressInfo;
 
   m_job = KIO::http_post(url, postData, jobFlags);
-  m_job->addMetaData("content-type", "Content-type: application/x-ofx");
-
+  m_job->addMetaData("content-type", "Content-Type: application/x-ofx");
+  //m_job->addMetaData("2", QString("Host: ").append(url.host()));
+  //m_job->addMetaData("3", QString("Content-Length: ").append(QString::number(postData.length())));
+  //m_job->addMetaData("4", "Connection: Keep-Alive");
   if (d->m_fpTrace.isOpen()) {
     QTextStream ts(&d->m_fpTrace);
     ts << "url: " << url.prettyUrl() << "\n";
@@ -476,8 +536,6 @@ void OfxHttpsRequest::slotOfxFinished(KJob* /* e */)
   if (m_eventLoop)
     m_eventLoop->exit();
 }
-
-
 
 OfxHttpRequest::OfxHttpRequest(const QString& type, const KUrl &url, const QByteArray &postData, const QMap<QString, QString>& metaData, const KUrl& dst, bool showProgressInfo) :
     m_job(0)

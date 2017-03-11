@@ -61,6 +61,8 @@ QStringList FipidForBank(const QString& bank);
 
 }
 
+bool OfxPythonHttpsRequest(const QString& method, const KUrl &url, const QByteArray &postData, const QMap<QString, QString>& metaData, const QString& dst);
+
 class OfxHttpRequest : public QObject
 {
   Q_OBJECT

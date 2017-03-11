@@ -45,6 +45,7 @@
 #include <mymoneyinstitution.h>
 #include <mymoneyfile.h>
 #include "mymoneyofxconnector.h"
+#include "../ofxpartner.h"
 
 class KOfxDirectConnectDlg::Private
 {
@@ -107,6 +108,15 @@ bool KOfxDirectConnectDlg::init()
     d->m_fpTrace.write(trcData, trcData.size());
     d->m_fpTrace.write("\n", 1);
     d->m_fpTrace.write("response:\n", 10);
+  }
+
+  KTemporaryFile tmpDownload;
+  if (tmpDownload.open() && OfxPythonHttpsRequest("POST", m_connector.url(), request, QMap<QString, QString>(), tmpDownload.fileName())) {
+    qDebug("OfxPython Emit statementReady signal with '%s'", qPrintable(tmpDownload.fileName()));
+    emit statementReady(tmpDownload.fileName());
+    qDebug("OfxPython Return from signal statementReady() processing");
+    hide();
+    return false;
   }
 
   qDebug("creating job");
