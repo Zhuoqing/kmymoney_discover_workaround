@@ -378,10 +378,12 @@ public:
 #include <ktemporaryfile.h>
 bool OfxPythonHttpsRequest(const QString& method, const KUrl &url, const QByteArray &postData, const QMap<QString, QString>& metaData, const QString& dst)
 {
+  qDebug("in OfxPythonHttpsRequest");
   QDir homeDir(QDir::home());
   if (!homeDir.exists("ofx_pythondownload.py")) {
     return false;
   }
+  qDebug("in OfxPythonHttpsRequest to run ofx py");
   KTemporaryFile tmpPost;
   if (!tmpPost.open()) {
     qWarning("Unable to open tempfile '%s' for post.", qPrintable(tmpPost.fileName()));

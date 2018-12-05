@@ -7,3 +7,4 @@ build*/
 ui_*.h
 moc_*.cpp
 *.moc
+debug/
